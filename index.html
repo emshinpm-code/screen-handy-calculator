@@ -27,6 +27,7 @@
     body {
       margin: 0;
       min-height: 100vh;
+      overflow-x: hidden;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background:
         linear-gradient(180deg, rgba(20, 107, 67, 0.12), rgba(238, 243, 239, 0) 330px),
@@ -185,6 +186,7 @@
       border: 1px solid var(--line);
       background: #fbfdfb;
       color: var(--ink);
+      font-size: 16px;
       padding: 0 12px;
       outline: none;
     }
@@ -200,6 +202,29 @@
       color: var(--muted);
       font-size: 13px;
       line-height: 1.45;
+    }
+
+    .storage-note {
+      margin: 0 0 12px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #fbfdfb;
+      padding: 10px 12px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .danger-outline {
+      width: 100%;
+      min-height: 42px;
+      border-radius: 8px;
+      border: 1px solid #e6b7b7;
+      background: #fff6f6;
+      color: var(--danger);
+      font-size: 13px;
+      font-weight: 800;
+      margin-bottom: 12px;
     }
 
     .warning {
@@ -424,6 +449,113 @@
       letter-spacing: 0;
     }
 
+    .debug-root {
+      display: none;
+      position: fixed;
+      right: 12px;
+      bottom: 12px;
+      z-index: 20;
+      width: min(360px, calc(100vw - 24px));
+    }
+
+    body.debug-enabled .debug-root {
+      display: block;
+    }
+
+    .debug-toggle {
+      display: block;
+      min-height: 40px;
+      margin-left: auto;
+      border-radius: 8px;
+      padding: 0 12px;
+      background: #17231d;
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 800;
+      box-shadow: 0 12px 24px rgba(23, 35, 29, 0.22);
+    }
+
+    .debug-panel {
+      display: none;
+      margin-top: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+      box-shadow: 0 18px 44px rgba(23, 35, 29, 0.2);
+      padding: 12px;
+    }
+
+    .debug-root.open .debug-panel {
+      display: block;
+    }
+
+    .debug-title {
+      margin: 0 0 6px;
+      font-size: 15px;
+      line-height: 1.3;
+      font-weight: 900;
+    }
+
+    .debug-copy {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .debug-meta {
+      display: grid;
+      gap: 4px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      background: #fbfdfb;
+      border: 1px solid var(--line);
+      padding: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+      overflow-wrap: anywhere;
+    }
+
+    .debug-actions {
+      display: grid;
+      gap: 8px;
+    }
+
+    .debug-actions button {
+      min-height: 38px;
+      border-radius: 8px;
+      background: var(--mint);
+      color: var(--green-2);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .debug-actions button.secondary-debug {
+      background: #f7faf8;
+      color: var(--ink);
+      border: 1px solid var(--line);
+    }
+
+    .debug-output {
+      display: none;
+      margin-top: 10px;
+      max-height: 210px;
+      overflow: auto;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #fbfdfb;
+      padding: 10px;
+      color: var(--ink);
+      font-size: 12px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+
+    .debug-output.show {
+      display: block;
+    }
+
     @media (max-width: 360px) {
       .app {
         padding-inline: 10px;
@@ -439,6 +571,12 @@
 
       .actions {
         grid-template-columns: 1fr;
+      }
+
+      .debug-root {
+        right: 10px;
+        bottom: 10px;
+        width: calc(100vw - 20px);
       }
     }
   </style>
@@ -465,9 +603,11 @@
 
     <section class="screen active" data-screen="1">
       <h2 class="section-title">1. 플레이어 등록</h2>
+      <p class="storage-note">입력한 플레이어 이름과 G핸디는 이 휴대폰에만 저장됩니다. 전체 초기화는 이번 게임만 초기화하고 저장 데이터는 유지합니다.</p>
       <div id="players"></div>
       <button class="add-player" type="button" id="addPlayer">+ 플레이어 추가</button>
       <p class="hint">1명부터 진행할 수 있지만, 실제 모임에서는 2명 이상 등록을 권장합니다.</p>
+      <button class="danger-outline" type="button" id="clearAppData">저장 데이터 전체 삭제</button>
       <div class="actions single">
         <button class="primary" type="button" id="toMode">다음</button>
       </div>
@@ -521,6 +661,26 @@
     </section>
   </main>
 
+  <aside class="debug-root" id="debugRoot" aria-label="검수 모드">
+    <button class="debug-toggle" type="button" id="debugToggle">검수 모드</button>
+    <div class="debug-panel" id="debugPanel">
+      <p class="debug-title">검수 모드</p>
+      <p class="debug-copy">검수 모드는 로컬 테스트용입니다. 일반 사용자는 ?debug=1 없이 접속하면 보이지 않습니다.</p>
+      <div class="debug-meta" id="debugMeta"></div>
+      <div class="debug-actions">
+        <button type="button" id="debugIndividual">개인전 샘플 입력</button>
+        <button type="button" id="debugTeam">팀전 샘플 입력</button>
+        <button type="button" id="debugInputTest">입력값 테스트</button>
+        <button type="button" id="debugStorageTest">저장 테스트</button>
+        <button class="secondary-debug" type="button" id="debugClearPlayers">저장 데이터 삭제</button>
+        <button class="secondary-debug" type="button" id="debugClearDatabase">데이터베이스 전체 삭제</button>
+        <button class="secondary-debug" type="button" id="debugReset">전체 초기화</button>
+        <button class="secondary-debug" type="button" id="debugClose">검수 패널 닫기</button>
+      </div>
+      <div class="debug-output" id="debugOutput" role="status"></div>
+    </div>
+  </aside>
+
   <template id="playerTemplate">
     <article class="card player-card">
       <div class="card-head">
@@ -539,14 +699,14 @@
   </template>
 
   <script>
+    const STORAGE_KEY = "screenHandyCalculator.players.v1";
+    const STORAGE_PREFIX = "screenHandyCalculator.";
+
     const state = {
       step: 1,
       mode: null,
       teamCount: 2,
-      players: [
-        createPlayer(),
-        createPlayer()
-      ]
+      players: loadPlayersForGame()
     };
 
     const teamNames = ["A팀", "B팀", "C팀", "D팀"];
@@ -558,15 +718,99 @@
     const teamCountEl = document.getElementById("teamCount");
     const scoresEl = document.getElementById("scores");
     const resultsEl = document.getElementById("results");
+    const debugRoot = document.getElementById("debugRoot");
+    const debugOutput = document.getElementById("debugOutput");
+    const debugMeta = document.getElementById("debugMeta");
 
     function createPlayer() {
+      const now = new Date().toISOString();
       return {
-        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+        id: createPlayerId(),
         name: "",
         handicap: "",
         team: null,
-        finalScore: ""
+        finalScore: "",
+        createdAt: now,
+        updatedAt: now
       };
+    }
+
+    function createPlayerId() {
+      if (window.crypto && typeof window.crypto.randomUUID === "function") {
+        return window.crypto.randomUUID();
+      }
+      return `p_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    }
+
+    function defaultPlayers() {
+      return [createPlayer(), createPlayer()];
+    }
+
+    function normalizeStoredPlayer(player) {
+      const now = new Date().toISOString();
+      return {
+        id: player && player.id ? String(player.id) : createPlayerId(),
+        name: player && player.name ? String(player.name) : "",
+        handicap: player && player.handicap !== undefined ? String(player.handicap) : "",
+        team: null,
+        finalScore: "",
+        createdAt: player && player.createdAt ? String(player.createdAt) : now,
+        updatedAt: player && player.updatedAt ? String(player.updatedAt) : now
+      };
+    }
+
+    function readStoredPlayers() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return [];
+        const data = JSON.parse(raw);
+        const players = Array.isArray(data) ? data : data.players;
+        if (!Array.isArray(players)) return [];
+        return players.map(normalizeStoredPlayer);
+      } catch (error) {
+        console.warn("Could not read saved players.", error);
+        return [];
+      }
+    }
+
+    function loadPlayersForGame() {
+      const players = readStoredPlayers();
+      return players.length ? players : defaultPlayers();
+    }
+
+    function saveStoredPlayers() {
+      try {
+        const now = new Date().toISOString();
+        const players = state.players.map(player => ({
+          id: player.id || createPlayerId(),
+          name: String(player.name || ""),
+          handicap: String(player.handicap || ""),
+          createdAt: player.createdAt || now,
+          updatedAt: player.updatedAt || now
+        }));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, players }));
+        updateDebugMeta();
+      } catch (error) {
+        console.warn("Could not save players.", error);
+      }
+    }
+
+    function removeStoredPlayers() {
+      localStorage.removeItem(STORAGE_KEY);
+      updateDebugMeta();
+    }
+
+    function clearAppDatabase() {
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(STORAGE_PREFIX)) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+      updateDebugMeta();
+      return keysToRemove.length;
     }
 
     function parseScore(value) {
@@ -652,7 +896,7 @@
       state.step = 1;
       state.mode = null;
       state.teamCount = 2;
-      state.players = [createPlayer(), createPlayer()];
+      state.players = loadPlayersForGame();
       renderPlayers();
       setStep(1);
     }
@@ -675,12 +919,17 @@
 
         nameInput.addEventListener("input", event => {
           player.name = event.target.value;
+          player.updatedAt = new Date().toISOString();
+          saveStoredPlayers();
         });
         handicapInput.addEventListener("input", event => {
           player.handicap = event.target.value;
+          player.updatedAt = new Date().toISOString();
+          saveStoredPlayers();
         });
         deleteBtn.addEventListener("click", () => {
           state.players = state.players.filter(item => item.id !== player.id);
+          saveStoredPlayers();
           renderPlayers();
         });
 
@@ -844,8 +1093,211 @@
       }[char]));
     }
 
+    function makePlayer({ name, handicap, team = null, finalScore = "" }) {
+      const now = new Date().toISOString();
+      return {
+        id: createPlayerId(),
+        name,
+        handicap: String(handicap),
+        team,
+        finalScore: String(finalScore),
+        createdAt: now,
+        updatedAt: now
+      };
+    }
+
+    function applyDebugScenario({ mode, teamCount = 2, players }) {
+      state.mode = mode;
+      state.teamCount = teamCount;
+      state.players = players.map(makePlayer);
+      renderPlayers();
+      setStep(5);
+    }
+
+    function runDebugIndividualSample() {
+      applyDebugScenario({
+        mode: "individual",
+        players: [
+          { name: "김프로", handicap: "-7", finalScore: "+5" },
+          { name: "박프로", handicap: "-5", finalScore: "-5" },
+          { name: "이프로", handicap: "-10", finalScore: "-13" }
+        ]
+      });
+      showDebugOutput([
+        "PASS: Individual sample loaded.",
+        "Expected ranking:",
+        "1. 이프로 / 3개 언더",
+        "2. 박프로 / 이븐",
+        "3. 김프로 / 12개 오버"
+      ].join("\n"));
+    }
+
+    function runDebugTeamSample() {
+      applyDebugScenario({
+        mode: "team",
+        teamCount: 2,
+        players: [
+          { name: "김프로", team: 0, handicap: "-7", finalScore: "+5" },
+          { name: "이프로", team: 0, handicap: "-10", finalScore: "-13" },
+          { name: "박프로", team: 1, handicap: "-5", finalScore: "-5" },
+          { name: "최프로", team: 1, handicap: "-3", finalScore: "+1" }
+        ]
+      });
+      showDebugOutput([
+        "PASS: Team sample loaded.",
+        "Expected team ranking:",
+        "1. B팀 / 4개 오버",
+        "2. A팀 / 9개 오버",
+        "",
+        "Expected individual ranking:",
+        "1. 이프로 / A팀 / 3개 언더",
+        "2. 박프로 / B팀 / 이븐",
+        "3. 최프로 / B팀 / 4개 오버",
+        "4. 김프로 / A팀 / 12개 오버"
+      ].join("\n"));
+    }
+
+    function runDebugInputTest() {
+      const parseCases = [
+        ["+5", 5],
+        ["5", 5],
+        ["-3", -3],
+        ["0", 0]
+      ];
+      const formatCases = [
+        [-3, "3개 언더"],
+        [0, "이븐"],
+        [5, "5개 오버"]
+      ];
+      const parseLines = parseCases.map(([input, expected]) => {
+        const actual = parseScore(input);
+        return `${actual === expected ? "PASS" : "FAIL"} parseScore(${input}) -> ${actual}`;
+      });
+      const formatLines = formatCases.map(([input, expected]) => {
+        const actual = formatResult(input);
+        return `${actual === expected ? "PASS" : "FAIL"} formatResult(${input}) -> ${actual}`;
+      });
+      showDebugOutput([...parseLines, "", ...formatLines].join("\n"));
+    }
+
+    function showDebugOutput(text) {
+      debugOutput.textContent = text;
+      debugOutput.classList.add("show");
+    }
+
+    function getAppStorageKeys() {
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(STORAGE_PREFIX)) keys.push(key);
+      }
+      return keys.sort();
+    }
+
+    function updateDebugMeta() {
+      if (!debugMeta) return;
+      const savedPlayers = readStoredPlayers();
+      const keys = getAppStorageKeys();
+      debugMeta.textContent = [
+        `저장된 플레이어: ${savedPlayers.length}명`,
+        `localStorage keys: ${keys.length ? keys.join(", ") : "없음"}`
+      ].join("\n");
+    }
+
+    function confirmDatabaseClear() {
+      const first = window.confirm("저장된 플레이어와 앱 설정이 모두 삭제됩니다. 계속할까요?");
+      if (!first) return false;
+      return window.confirm("정말 전체 저장 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.");
+    }
+
+    function resetAfterStorageClear() {
+      state.step = 1;
+      state.mode = null;
+      state.teamCount = 2;
+      state.players = defaultPlayers();
+      renderPlayers();
+      setStep(1);
+    }
+
+    function handleDatabaseClear({ requireConfirm = true, debug = false } = {}) {
+      if (requireConfirm && !confirmDatabaseClear()) return;
+      const removedCount = clearAppDatabase();
+      resetAfterStorageClear();
+      showMessage("저장 데이터가 모두 삭제되었습니다.");
+      if (debug) {
+        const keys = getAppStorageKeys();
+        const isDefault = state.players.length === 2 && state.players.every(player => !player.name && !player.handicap);
+        showDebugOutput([
+          `${keys.length === 0 ? "PASS" : "FAIL"} localStorage app keys cleared`,
+          `${isDefault ? "PASS" : "FAIL"} default two player cards restored`,
+          `Removed keys: ${removedCount}`
+        ].join("\n"));
+      }
+      updateDebugMeta();
+    }
+
+    function runDebugStorageTest() {
+      const players = [
+        { name: "저장김", handicap: "-7" },
+        { name: "저장박", handicap: "-5" },
+        { name: "저장이", handicap: "-10" }
+      ].map(makePlayer);
+      state.step = 1;
+      state.mode = null;
+      state.teamCount = 2;
+      state.players = players;
+      saveStoredPlayers();
+      renderPlayers();
+      setStep(1);
+
+      const savedPlayers = readStoredPlayers();
+      const names = savedPlayers.map(player => player.name).join(", ");
+      const passCount = savedPlayers.length === 3;
+      const passNames = names === "저장김, 저장박, 저장이";
+      showDebugOutput([
+        `${passCount ? "PASS" : "FAIL"} saved player count -> ${savedPlayers.length}`,
+        `${passNames ? "PASS" : "FAIL"} saved player names -> ${names}`,
+        "새로고침 후에도 플레이어가 남아있는지 확인할 수 있습니다."
+      ].join("\n"));
+      updateDebugMeta();
+    }
+
+    function setupDebugMode() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("debug") !== "1") return;
+
+      document.body.classList.add("debug-enabled");
+      updateDebugMeta();
+      document.getElementById("debugToggle").addEventListener("click", () => {
+        debugRoot.classList.toggle("open");
+        updateDebugMeta();
+      });
+      document.getElementById("debugClose").addEventListener("click", () => {
+        debugRoot.classList.remove("open");
+      });
+      document.getElementById("debugIndividual").addEventListener("click", runDebugIndividualSample);
+      document.getElementById("debugTeam").addEventListener("click", runDebugTeamSample);
+      document.getElementById("debugInputTest").addEventListener("click", runDebugInputTest);
+      document.getElementById("debugStorageTest").addEventListener("click", runDebugStorageTest);
+      document.getElementById("debugClearPlayers").addEventListener("click", () => {
+        removeStoredPlayers();
+        resetAfterStorageClear();
+        showDebugOutput("PASS: Saved players deleted.");
+        updateDebugMeta();
+      });
+      document.getElementById("debugClearDatabase").addEventListener("click", () => {
+        handleDatabaseClear({ requireConfirm: true, debug: true });
+      });
+      document.getElementById("debugReset").addEventListener("click", () => {
+        resetAll();
+        showDebugOutput("PASS: App state reset.");
+        updateDebugMeta();
+      });
+    }
+
     document.getElementById("addPlayer").addEventListener("click", () => {
       state.players.push(createPlayer());
+      saveStoredPlayers();
       renderPlayers();
     });
 
@@ -889,8 +1341,12 @@
     document.getElementById("editScores").addEventListener("click", () => setStep(4));
     document.getElementById("startOver").addEventListener("click", resetAll);
     document.querySelector("[data-reset]").addEventListener("click", resetAll);
+    document.getElementById("clearAppData").addEventListener("click", () => {
+      handleDatabaseClear({ requireConfirm: true });
+    });
 
     renderPlayers();
+    setupDebugMode();
   </script>
 </body>
 </html>
