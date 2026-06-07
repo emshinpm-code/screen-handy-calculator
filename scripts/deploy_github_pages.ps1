@@ -15,12 +15,25 @@ function Write-Step {
 function Require-Command {
   param(
     [string]$Name,
-    [string]$InstallMessage
+    [string]$InstallMessage,
+    [string[]]$CandidatePaths = @()
   )
 
-  if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
-    throw "$Name command was not found. $InstallMessage"
+  if (Get-Command $Name -ErrorAction SilentlyContinue) {
+    return
   }
+
+  foreach ($candidate in $CandidatePaths) {
+    if (-not [string]::IsNullOrWhiteSpace($candidate) -and (Test-Path -LiteralPath $candidate)) {
+      $candidateDirectory = Split-Path -Parent $candidate
+      $env:Path = "$candidateDirectory;$env:Path"
+      if (Get-Command $Name -ErrorAction SilentlyContinue) {
+        return
+      }
+    }
+  }
+
+  throw "$Name command was not found. $InstallMessage"
 }
 
 function Run-Gh {
@@ -39,9 +52,53 @@ function Run-Git {
   }
 }
 
+function Get-PagesUrl {
+  param(
+    [string]$Owner,
+    [string]$RepoName
+  )
+
+  $url = (& gh api "/repos/$Owner/$RepoName/pages" --jq ".html_url" 2>$null)
+  if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($url)) {
+    return $url.Trim()
+  }
+
+  return ""
+}
+
+function Get-RemoteUrl {
+  param(
+    [string]$Owner,
+    [string]$RepoName
+  )
+
+  $url = (& gh repo view "$Owner/$RepoName" --json url --jq ".url" 2>$null)
+  if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($url)) {
+    return $url.Trim()
+  }
+
+  return ""
+}
+
 Write-Step "Checking required tools"
-Require-Command "git" "Install Git, then reopen PowerShell."
-Require-Command "gh" "Install GitHub CLI, then reopen PowerShell."
+$gitCandidates = @(
+  "$env:ProgramFiles\Git\cmd\git.exe",
+  "$env:ProgramFiles\Git\bin\git.exe",
+  "${env:ProgramFiles(x86)}\Git\cmd\git.exe",
+  "${env:ProgramFiles(x86)}\Git\bin\git.exe",
+  "$env:LocalAppData\Programs\Git\cmd\git.exe",
+  "$env:LocalAppData\Programs\Git\bin\git.exe"
+)
+
+$ghCandidates = @(
+  "$env:ProgramFiles\GitHub CLI\gh.exe",
+  "${env:ProgramFiles(x86)}\GitHub CLI\gh.exe",
+  "$env:LocalAppData\Programs\GitHub CLI\gh.exe",
+  "$env:LocalAppData\GitHub CLI\gh.exe"
+)
+
+Require-Command "git" "Install Git, then reopen PowerShell." $gitCandidates
+Require-Command "gh" "Install GitHub CLI, then reopen PowerShell." $ghCandidates
 
 Write-Step "Checking GitHub CLI authentication"
 & gh auth status
@@ -54,6 +111,14 @@ if ($LASTEXITCODE -ne 0) {
   Write-Host "  gh auth setup-git"
   exit 1
 }
+
+Write-Step "Reading GitHub owner"
+$Owner = (& gh api user --jq ".login")
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($Owner)) {
+  throw "Could not read GitHub login."
+}
+$Owner = $Owner.Trim()
+Write-Host "Owner: $Owner"
 
 Write-Step "Checking project files"
 $requiredFiles = @(
@@ -76,6 +141,21 @@ if (-not (Test-Path -LiteralPath ".git")) {
 
 Run-Git @("branch", "-M", "main")
 
+Write-Step "Creating local commit if needed"
+$hasCommit = $true
+& git rev-parse --verify HEAD *> $null
+if ($LASTEXITCODE -ne 0) {
+  $hasCommit = $false
+}
+
+$status = (& git status --porcelain)
+if (-not $hasCommit -or -not [string]::IsNullOrWhiteSpace($status)) {
+  Run-Git @("add", ".")
+  Run-Git @("commit", "-m", $CommitMessage)
+} else {
+  Write-Host "No changes to commit."
+}
+
 Write-Step "Checking remote repository"
 $originUrl = ""
 try {
@@ -86,42 +166,51 @@ try {
 
 if ([string]::IsNullOrWhiteSpace($originUrl)) {
   $visibility = if ($Public) { "--public" } else { "--private" }
-  Write-Step "Creating GitHub repository: $RepoName"
-  Run-Gh @("repo", "create", $RepoName, $visibility, "--source=.", "--remote=origin", "--push")
+  $existingRepoUrl = Get-RemoteUrl -Owner $Owner -RepoName $RepoName
+
+  if ([string]::IsNullOrWhiteSpace($existingRepoUrl)) {
+    Write-Step "Creating GitHub repository: $RepoName"
+    Run-Gh @("repo", "create", $RepoName, $visibility, "--source=.", "--remote=origin")
+  } else {
+    Write-Step "Connecting existing GitHub repository: $RepoName"
+    Run-Git @("remote", "add", "origin", $existingRepoUrl)
+  }
 } else {
   Write-Host "origin: $originUrl"
 }
 
-Write-Step "Committing and pushing changes"
-$status = (& git status --porcelain)
-if (-not [string]::IsNullOrWhiteSpace($status)) {
-  Run-Git @("add", ".")
-  Run-Git @("commit", "-m", $CommitMessage)
-} else {
-  Write-Host "No changes to commit."
-}
-
+Write-Step "Pushing main branch"
 Run-Git @("push", "-u", "origin", "main")
 
 Write-Step "Enabling GitHub Pages"
+$pagesPath = "/repos/$Owner/$RepoName/pages"
 $pagesPostArgs = @(
   "api",
   "--method", "POST",
-  "/repos/:owner/$RepoName/pages",
-  "-f", "source.branch=main",
-  "-f", "source.path=/"
+  $pagesPath,
+  "-f", "source[branch]=main",
+  "-f", "source[path]=/"
 )
 
 & gh @pagesPostArgs
 if ($LASTEXITCODE -ne 0) {
   Write-Host "Pages may already be enabled. Trying to update the Pages configuration." -ForegroundColor Yellow
-  Run-Gh @(
+  & gh @(
     "api",
     "--method", "PUT",
-    "/repos/:owner/$RepoName/pages",
-    "-f", "source.branch=main",
-    "-f", "source.path=/"
+    $pagesPath,
+    "-f", "source[branch]=main",
+    "-f", "source[path]=/"
   )
+
+  if ($LASTEXITCODE -ne 0) {
+    $existingPagesUrl = Get-PagesUrl -Owner $Owner -RepoName $RepoName
+    if ([string]::IsNullOrWhiteSpace($existingPagesUrl)) {
+      throw "Could not enable or read GitHub Pages."
+    }
+
+    Write-Host "Pages is already enabled."
+  }
 }
 
 Write-Step "Reading deployment information"
@@ -131,14 +220,30 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $repoInfo = $repoInfoJson | ConvertFrom-Json
-$owner = ($repoInfo.nameWithOwner -split "/")[0]
-$pagesUrl = "https://$owner.github.io/$RepoName/"
+$PagesUrl = ""
+for ($attempt = 1; $attempt -le 3; $attempt++) {
+  $PagesUrl = Get-PagesUrl -Owner $Owner -RepoName $RepoName
+  if (-not [string]::IsNullOrWhiteSpace($PagesUrl)) {
+    break
+  }
+
+  if ($attempt -lt 3) {
+    Write-Host "Pages URL is not ready yet. Retrying in 3 seconds..."
+    Start-Sleep -Seconds 3
+  }
+}
+
+if ([string]::IsNullOrWhiteSpace($PagesUrl)) {
+  $PagesUrl = "https://$Owner.github.io/$RepoName/"
+  Write-Host "Could not read Pages html_url. Using expected Pages URL." -ForegroundColor Yellow
+}
+
 $branch = (& git branch --show-current)
 $commit = (& git rev-parse --short HEAD)
 
 Write-Host ""
 Write-Host "Repository URL: $($repoInfo.url)"
-Write-Host "Pages URL: $pagesUrl"
+Write-Host "Pages URL: $PagesUrl"
 Write-Host "Current branch: $branch"
 Write-Host "Last commit hash: $commit"
 Write-Host "GitHub Pages enabled."
