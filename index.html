@@ -1,0 +1,896 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>스크린 G핸디 계산기</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #eef3ef;
+      --panel: #ffffff;
+      --ink: #17231d;
+      --muted: #637069;
+      --line: #d9e2dc;
+      --green: #146b43;
+      --green-2: #0f5132;
+      --mint: #e2f4ea;
+      --gold: #c8912e;
+      --danger: #b33a3a;
+      --shadow: 0 14px 36px rgba(25, 55, 39, 0.13);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        linear-gradient(180deg, rgba(20, 107, 67, 0.12), rgba(238, 243, 239, 0) 330px),
+        var(--bg);
+      color: var(--ink);
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.52;
+    }
+
+    .app {
+      width: min(100%, 430px);
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 18px 14px 24px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 2px 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 27px;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .reset {
+      min-width: 42px;
+      min-height: 42px;
+      border-radius: 8px;
+      background: #f7faf8;
+      color: var(--green-2);
+      border: 1px solid var(--line);
+      font-size: 20px;
+      line-height: 1;
+      box-shadow: 0 3px 10px rgba(25, 55, 39, 0.06);
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .step-dot {
+      height: 6px;
+      border-radius: 999px;
+      background: #cfd9d2;
+    }
+
+    .step-dot.active {
+      background: var(--green);
+    }
+
+    .screen {
+      display: none;
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    .section-title {
+      margin: 4px 0 12px;
+      font-size: 20px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+
+    .player-card {
+      display: grid;
+      gap: 10px;
+    }
+
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-height: 32px;
+    }
+
+    .card-title {
+      font-weight: 800;
+      font-size: 15px;
+    }
+
+    .ghost-btn {
+      min-height: 34px;
+      border-radius: 8px;
+      padding: 0 10px;
+      color: var(--green-2);
+      background: var(--mint);
+      font-weight: 700;
+    }
+
+    .delete-btn {
+      min-width: 34px;
+      min-height: 34px;
+      border-radius: 8px;
+      background: #f7e8e8;
+      color: var(--danger);
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    input,
+    select {
+      width: 100%;
+      min-height: 46px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #fbfdfb;
+      color: var(--ink);
+      padding: 0 12px;
+      outline: none;
+    }
+
+    input:focus,
+    select:focus {
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px rgba(20, 107, 67, 0.14);
+    }
+
+    .hint {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .warning {
+      display: none;
+      margin: 0 0 12px;
+      border-radius: 8px;
+      background: #fff8e8;
+      color: #6d4a06;
+      border: 1px solid #ead8a5;
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .warning.show {
+      display: block;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 14px;
+      padding-bottom: 8px;
+    }
+
+    .actions.single {
+      grid-template-columns: 1fr;
+    }
+
+    .primary,
+    .secondary {
+      min-height: 48px;
+      border-radius: 8px;
+      font-weight: 800;
+      padding: 0 12px;
+    }
+
+    .primary {
+      color: #ffffff;
+      background: var(--green);
+    }
+
+    .secondary {
+      color: var(--green-2);
+      background: #ffffff;
+      border: 1px solid var(--line);
+    }
+
+    .add-player {
+      width: 100%;
+      min-height: 46px;
+      border-radius: 8px;
+      background: #fff8e8;
+      color: #6f4c08;
+      font-weight: 800;
+      border: 1px solid #ead8a5;
+      margin-bottom: 12px;
+    }
+
+    .mode-grid,
+    .team-count {
+      display: grid;
+      gap: 10px;
+    }
+
+    .mode-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .mode-btn,
+    .team-btn {
+      min-height: 86px;
+      border-radius: 8px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      color: var(--ink);
+      box-shadow: var(--shadow);
+      text-align: left;
+      padding: 14px;
+    }
+
+    .mode-btn strong,
+    .team-btn strong {
+      display: block;
+      font-size: 18px;
+      margin-bottom: 5px;
+    }
+
+    .mode-btn span,
+    .team-btn span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .team-count {
+      grid-template-columns: repeat(3, 1fr);
+      margin-bottom: 12px;
+    }
+
+    .team-btn {
+      min-height: 68px;
+      text-align: center;
+      padding: 10px;
+    }
+
+    .team-btn.selected {
+      border-color: var(--green);
+      background: var(--mint);
+    }
+
+    .team-card {
+      padding: 12px;
+    }
+
+    .team-card h3 {
+      margin: 0 0 10px;
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+
+    .check-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .check-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-height: 42px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #fbfdfb;
+      padding: 8px 10px;
+    }
+
+    .check-row.disabled {
+      opacity: 0.45;
+    }
+
+    .check-row span {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      font-weight: 700;
+    }
+
+    .check-row input {
+      width: 20px;
+      min-height: 20px;
+      accent-color: var(--green);
+      flex: 0 0 auto;
+    }
+
+    .score-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: -2px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      border-radius: 999px;
+      padding: 0 9px;
+      background: var(--mint);
+      color: var(--green-2);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .result-card {
+      display: grid;
+      gap: 8px;
+    }
+
+    .rank-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .rank {
+      color: var(--gold);
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .result-main {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      font-weight: 900;
+      font-size: 17px;
+    }
+
+    .result-sub {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .result-score {
+      color: var(--green-2);
+      font-weight: 900;
+      font-size: 16px;
+    }
+
+    .divider-title {
+      margin: 20px 0 10px;
+      font-size: 17px;
+      line-height: 1.3;
+      letter-spacing: 0;
+    }
+
+    @media (max-width: 360px) {
+      .app {
+        padding-inline: 10px;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+
+      .mode-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .actions {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <h1>스크린 G핸디 계산기</h1>
+        <p class="subtitle">골프존 G핸디 기준 자동 계산</p>
+      </div>
+      <button class="reset" type="button" title="초기화" aria-label="초기화" data-reset>↻</button>
+    </header>
+
+    <nav class="steps" aria-label="진행 단계">
+      <span class="step-dot active"></span>
+      <span class="step-dot"></span>
+      <span class="step-dot"></span>
+      <span class="step-dot"></span>
+      <span class="step-dot"></span>
+    </nav>
+
+    <p class="warning" id="message" role="alert"></p>
+
+    <section class="screen active" data-screen="1">
+      <h2 class="section-title">1. 플레이어 등록</h2>
+      <div id="players"></div>
+      <button class="add-player" type="button" id="addPlayer">+ 플레이어 추가</button>
+      <p class="hint">1명부터 진행할 수 있지만, 실제 모임에서는 2명 이상 등록을 권장합니다.</p>
+      <div class="actions single">
+        <button class="primary" type="button" id="toMode">다음</button>
+      </div>
+    </section>
+
+    <section class="screen" data-screen="2">
+      <h2 class="section-title">2. 경기 방식 선택</h2>
+      <div class="mode-grid">
+        <button class="mode-btn" type="button" data-mode="individual">
+          <strong>개인전</strong>
+          <span>개인 핸디 대비 결과로 순위를 계산합니다.</span>
+        </button>
+        <button class="mode-btn" type="button" data-mode="team">
+          <strong>팀전</strong>
+          <span>팀 합산 순위와 개인 순위를 함께 봅니다.</span>
+        </button>
+      </div>
+      <div class="actions">
+        <button class="secondary" type="button" data-prev>이전</button>
+        <button class="primary" type="button" disabled>다음</button>
+      </div>
+    </section>
+
+    <section class="screen" data-screen="3">
+      <h2 class="section-title">3. 팀 구성</h2>
+      <div class="team-count" id="teamCount"></div>
+      <div id="teams"></div>
+      <div class="actions">
+        <button class="secondary" type="button" data-prev>이전</button>
+        <button class="primary" type="button" id="finishTeams">다음</button>
+      </div>
+    </section>
+
+    <section class="screen" data-screen="4">
+      <h2 class="section-title">4. 최종 스코어 입력</h2>
+      <p class="hint">최종 스코어는 골프존 결과 기준으로 입력하세요. 예: +5, -3, 0</p>
+      <div class="score-grid" id="scores"></div>
+      <div class="actions">
+        <button class="secondary" type="button" data-prev>이전</button>
+        <button class="primary" type="button" id="calculate">계산하기</button>
+      </div>
+    </section>
+
+    <section class="screen" data-screen="5">
+      <h2 class="section-title">5. 최종 순위</h2>
+      <div id="results"></div>
+      <div class="actions">
+        <button class="secondary" type="button" id="editScores">스코어 수정하기</button>
+        <button class="primary" type="button" id="startOver">처음부터 다시하기</button>
+      </div>
+    </section>
+  </main>
+
+  <template id="playerTemplate">
+    <article class="card player-card">
+      <div class="card-head">
+        <span class="card-title"></span>
+        <button class="delete-btn" type="button" title="플레이어 삭제" aria-label="플레이어 삭제">×</button>
+      </div>
+      <label>
+        이름
+        <input type="text" data-field="name" autocomplete="off" placeholder="예: 김프로">
+      </label>
+      <label>
+        G핸디캡
+        <input type="text" inputmode="numeric" data-field="handicap" placeholder="예: -7">
+      </label>
+    </article>
+  </template>
+
+  <script>
+    const state = {
+      step: 1,
+      mode: null,
+      teamCount: 2,
+      players: [
+        createPlayer(),
+        createPlayer()
+      ]
+    };
+
+    const teamNames = ["A팀", "B팀", "C팀", "D팀"];
+    const screens = Array.from(document.querySelectorAll("[data-screen]"));
+    const stepDots = Array.from(document.querySelectorAll(".step-dot"));
+    const message = document.getElementById("message");
+    const playersEl = document.getElementById("players");
+    const teamsEl = document.getElementById("teams");
+    const teamCountEl = document.getElementById("teamCount");
+    const scoresEl = document.getElementById("scores");
+    const resultsEl = document.getElementById("results");
+
+    function createPlayer() {
+      return {
+        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+        name: "",
+        handicap: "",
+        team: null,
+        finalScore: ""
+      };
+    }
+
+    function parseScore(value) {
+      const text = String(value).trim();
+      if (!/^[+-]?\d+$/.test(text)) return null;
+      return Number(text);
+    }
+
+    function formatSigned(value) {
+      return value > 0 ? `+${value}` : String(value);
+    }
+
+    function formatResult(value) {
+      if (value < 0) return `${Math.abs(value)}개 언더`;
+      if (value === 0) return "이븐";
+      return `${value}개 오버`;
+    }
+
+    function calculatePlayerResult(player) {
+      return {
+        ...player,
+        handicapValue: parseScore(player.handicap),
+        finalScoreValue: parseScore(player.finalScore),
+        resultScore: parseScore(player.finalScore) - parseScore(player.handicap)
+      };
+    }
+
+    function withRanks(items, scoreKey) {
+      let previousScore = null;
+      let previousRank = 0;
+      return items.map((item, index) => {
+        const score = item[scoreKey];
+        const rank = score === previousScore ? previousRank : index + 1;
+        previousScore = score;
+        previousRank = rank;
+        return { ...item, rank };
+      });
+    }
+
+    function calculateIndividualRanking(players) {
+      const calculated = players
+        .map(calculatePlayerResult)
+        .sort((a, b) => a.resultScore - b.resultScore);
+      return withRanks(calculated, "resultScore");
+    }
+
+    function calculateTeamRanking(players) {
+      const calculated = players.map(calculatePlayerResult);
+      const teams = teamNames.slice(0, state.teamCount).map((name, index) => {
+        const members = calculated.filter(player => player.team === index);
+        return {
+          team: index,
+          name,
+          members,
+          resultScore: members.reduce((sum, player) => sum + player.resultScore, 0)
+        };
+      }).sort((a, b) => a.resultScore - b.resultScore);
+      return withRanks(teams, "resultScore");
+    }
+
+    function showMessage(text) {
+      message.textContent = text;
+      message.classList.toggle("show", Boolean(text));
+      if (text) window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function setStep(step) {
+      state.step = step;
+      screens.forEach(screen => {
+        screen.classList.toggle("active", Number(screen.dataset.screen) === step);
+      });
+      stepDots.forEach((dot, index) => {
+        dot.classList.toggle("active", index < step);
+      });
+      showMessage("");
+      if (step === 3) renderTeams();
+      if (step === 4) renderScores();
+      if (step === 5) renderResults();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function resetAll() {
+      state.step = 1;
+      state.mode = null;
+      state.teamCount = 2;
+      state.players = [createPlayer(), createPlayer()];
+      renderPlayers();
+      setStep(1);
+    }
+
+    function renderPlayers() {
+      playersEl.replaceChildren();
+      state.players.forEach((player, index) => {
+        const node = document.getElementById("playerTemplate").content.cloneNode(true);
+        const card = node.querySelector(".player-card");
+        const title = node.querySelector(".card-title");
+        const deleteBtn = node.querySelector(".delete-btn");
+        const nameInput = node.querySelector('[data-field="name"]');
+        const handicapInput = node.querySelector('[data-field="handicap"]');
+
+        card.dataset.id = player.id;
+        title.textContent = `플레이어 ${index + 1}`;
+        nameInput.value = player.name;
+        handicapInput.value = player.handicap;
+        deleteBtn.disabled = state.players.length === 1;
+
+        nameInput.addEventListener("input", event => {
+          player.name = event.target.value;
+        });
+        handicapInput.addEventListener("input", event => {
+          player.handicap = event.target.value;
+        });
+        deleteBtn.addEventListener("click", () => {
+          state.players = state.players.filter(item => item.id !== player.id);
+          renderPlayers();
+        });
+
+        playersEl.appendChild(node);
+      });
+    }
+
+    function validatePlayers() {
+      if (state.players.length < 1) return "최소 1명 이상 등록해 주세요.";
+      const invalid = state.players.find(player => !player.name.trim() || parseScore(player.handicap) === null);
+      if (invalid) return "모든 플레이어의 이름과 숫자 형식의 G핸디캡을 입력해 주세요.";
+      return "";
+    }
+
+    function renderTeamCount() {
+      teamCountEl.replaceChildren();
+      [2, 3, 4].forEach(count => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `team-btn${state.teamCount === count ? " selected" : ""}`;
+        button.innerHTML = `<strong>${count}팀</strong><span>${teamNames.slice(0, count).join(" · ")}</span>`;
+        button.addEventListener("click", () => {
+          state.teamCount = count;
+          state.players.forEach(player => {
+            if (player.team !== null && player.team >= count) player.team = null;
+          });
+          renderTeams();
+        });
+        teamCountEl.appendChild(button);
+      });
+    }
+
+    function renderTeams() {
+      renderTeamCount();
+      teamsEl.replaceChildren();
+      teamNames.slice(0, state.teamCount).forEach((teamName, teamIndex) => {
+        const card = document.createElement("article");
+        card.className = "card team-card";
+        const title = document.createElement("h3");
+        title.textContent = teamName;
+        const list = document.createElement("div");
+        list.className = "check-list";
+
+        state.players.forEach(player => {
+          const row = document.createElement("label");
+          row.className = "check-row";
+          const name = document.createElement("span");
+          name.textContent = player.name;
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.checked = player.team === teamIndex;
+          checkbox.disabled = player.team !== null && player.team !== teamIndex;
+          if (checkbox.disabled) row.classList.add("disabled");
+          checkbox.addEventListener("change", event => {
+            player.team = event.target.checked ? teamIndex : null;
+            renderTeams();
+          });
+          row.append(name, checkbox);
+          list.appendChild(row);
+        });
+
+        card.append(title, list);
+        teamsEl.appendChild(card);
+      });
+    }
+
+    function validateTeams() {
+      const unassigned = state.players.find(player => player.team === null);
+      if (unassigned) return "모든 플레이어를 반드시 한 팀에 배정해 주세요.";
+      const activeTeams = teamNames.slice(0, state.teamCount);
+      const emptyTeam = activeTeams.find((_, index) => !state.players.some(player => player.team === index));
+      if (emptyTeam) return "팀전에서는 선택한 모든 팀에 플레이어가 1명 이상 있어야 합니다.";
+      return "";
+    }
+
+    function renderScores() {
+      scoresEl.replaceChildren();
+      state.players.forEach(player => {
+        const card = document.createElement("article");
+        card.className = "card player-card";
+        const teamLabel = state.mode === "team" && player.team !== null ? `<span class="pill">${teamNames[player.team]}</span>` : "";
+        card.innerHTML = `
+          <div>
+            <div class="card-title">${escapeHtml(player.name)}</div>
+            <div class="meta">
+              <span class="pill">G핸디 ${formatSigned(parseScore(player.handicap))}</span>
+              ${teamLabel}
+            </div>
+          </div>
+          <label>
+            최종 스코어
+            <input type="text" inputmode="numeric" placeholder="예: +5" value="${escapeHtml(player.finalScore)}">
+          </label>
+        `;
+        card.querySelector("input").addEventListener("input", event => {
+          player.finalScore = event.target.value;
+        });
+        scoresEl.appendChild(card);
+      });
+    }
+
+    function validateScores() {
+      const invalid = state.players.find(player => parseScore(player.finalScore) === null);
+      if (invalid) return "모든 플레이어의 최종 스코어를 숫자로 입력해 주세요. +5, -3, 0 모두 가능합니다.";
+      return "";
+    }
+
+    function renderResults() {
+      resultsEl.replaceChildren();
+      if (state.mode === "team") {
+        const teamTitle = document.createElement("h3");
+        teamTitle.className = "divider-title";
+        teamTitle.textContent = "팀 순위";
+        resultsEl.appendChild(teamTitle);
+        calculateTeamRanking(state.players).forEach(team => {
+          resultsEl.appendChild(resultCard({
+            rank: team.rank,
+            title: team.name,
+            sub: `${team.members.map(member => member.name).join(" · ") || "배정 없음"}`,
+            score: `팀 합산 ${formatResult(team.resultScore)}`
+          }));
+        });
+
+        const personalTitle = document.createElement("h3");
+        personalTitle.className = "divider-title";
+        personalTitle.textContent = "개인 순위";
+        resultsEl.appendChild(personalTitle);
+      }
+
+      calculateIndividualRanking(state.players).forEach(player => {
+        resultsEl.appendChild(resultCard({
+          rank: player.rank,
+          title: `${player.name}${state.mode === "team" ? ` ${teamNames[player.team]}` : ""}`,
+          sub: `G핸디 ${formatSigned(player.handicapValue)} · 최종 ${formatSigned(player.finalScoreValue)}`,
+          score: `핸디 대비 ${formatResult(player.resultScore)}`
+        }));
+      });
+    }
+
+    function resultCard({ rank, title, sub, score }) {
+      const card = document.createElement("article");
+      card.className = "card result-card";
+      card.innerHTML = `
+        <div class="rank-line">
+          <div class="result-main">${escapeHtml(title)}</div>
+          <div class="rank">${rank}위</div>
+        </div>
+        <div class="result-sub">${escapeHtml(sub)}</div>
+        <div class="result-score">${escapeHtml(score)}</div>
+      `;
+      return card;
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      }[char]));
+    }
+
+    document.getElementById("addPlayer").addEventListener("click", () => {
+      state.players.push(createPlayer());
+      renderPlayers();
+    });
+
+    document.getElementById("toMode").addEventListener("click", () => {
+      const error = validatePlayers();
+      if (error) return showMessage(error);
+      setStep(2);
+    });
+
+    document.querySelectorAll("[data-mode]").forEach(button => {
+      button.addEventListener("click", () => {
+        state.mode = button.dataset.mode;
+        if (state.mode === "individual") {
+          state.players.forEach(player => { player.team = null; });
+          setStep(4);
+        } else {
+          setStep(3);
+        }
+      });
+    });
+
+    document.querySelectorAll("[data-prev]").forEach(button => {
+      button.addEventListener("click", () => {
+        if (state.step === 4 && state.mode === "individual") return setStep(2);
+        setStep(Math.max(1, state.step - 1));
+      });
+    });
+
+    document.getElementById("finishTeams").addEventListener("click", () => {
+      const error = validateTeams();
+      if (error) return showMessage(error);
+      setStep(4);
+    });
+
+    document.getElementById("calculate").addEventListener("click", () => {
+      const error = validateScores();
+      if (error) return showMessage(error);
+      setStep(5);
+    });
+
+    document.getElementById("editScores").addEventListener("click", () => setStep(4));
+    document.getElementById("startOver").addEventListener("click", resetAll);
+    document.querySelector("[data-reset]").addEventListener("click", resetAll);
+
+    renderPlayers();
+  </script>
+</body>
+</html>
